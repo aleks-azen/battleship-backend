@@ -12,14 +12,24 @@ class FiringService @Inject constructor(
     private val gameService: GameService
 ) {
 
-    fun fire(gameId: String, row: Int, col: Int): FireResponse {
+    fun fire(gameId: String, playerToken: String, row: Int, col: Int): FireResponse {
         val game = gameService.getGame(gameId)
+            ?: throw IllegalArgumentException("Game not found: $gameId")
         require(game.status == GameStatus.IN_PROGRESS) {
             "Cannot fire in game with status ${game.status}"
         }
 
+        val playerNumber = when (playerToken) {
+            game.player1Token -> 1
+            game.player2Token -> 2
+            else -> throw IllegalArgumentException("Invalid player token")
+        }
+        require(playerNumber == game.currentTurn) {
+            "It is not your turn"
+        }
+
         val coordinate = Coordinate(row, col)
-        val targetBoard = game.opponentBoard
+        val targetBoard = if (playerNumber == 1) game.player2.board else game.player1.board
 
         if (coordinate in targetBoard.shots) {
             return FireResponse(
@@ -44,13 +54,29 @@ class FiringService @Inject constructor(
         }
 
         val gameOver = result == ShotResult.GAME_OVER
-        val updatedGame = game.copy(
-            opponentBoard = updatedBoard,
-            status = if (gameOver) GameStatus.FINISHED else game.status,
-            winnerId = if (gameOver) "player" else null,
-            currentTurn = if (!gameOver) "opponent" else game.currentTurn,
-            updatedAt = System.currentTimeMillis()
-        )
+        val updatedPlayerState = if (playerNumber == 1) {
+            game.player2.copy(board = updatedBoard)
+        } else {
+            game.player1.copy(board = updatedBoard)
+        }
+
+        val updatedGame = if (playerNumber == 1) {
+            game.copy(
+                player2 = updatedPlayerState,
+                status = if (gameOver) GameStatus.COMPLETED else game.status,
+                winner = if (gameOver) playerNumber else null,
+                currentTurn = if (!gameOver) 2 else game.currentTurn,
+                updatedAt = System.currentTimeMillis()
+            )
+        } else {
+            game.copy(
+                player1 = updatedPlayerState,
+                status = if (gameOver) GameStatus.COMPLETED else game.status,
+                winner = if (gameOver) playerNumber else null,
+                currentTurn = if (!gameOver) 1 else game.currentTurn,
+                updatedAt = System.currentTimeMillis()
+            )
+        }
         gameService.saveGame(updatedGame)
 
         return FireResponse(
@@ -58,7 +84,7 @@ class FiringService @Inject constructor(
             coordinate = coordinate,
             sunkShip = if (result == ShotResult.SUNK || result == ShotResult.GAME_OVER) hitShip?.type else null,
             gameOver = gameOver,
-            winnerId = if (gameOver) "player" else null
+            winnerId = if (gameOver) "player$playerNumber" else null
         )
     }
 }

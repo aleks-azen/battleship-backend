@@ -13,11 +13,14 @@ class PlacementService @Inject constructor(
     private val gameService: GameService
 ) {
 
-    fun placeShips(gameId: String, placements: List<ShipPlacement>): Game {
+    fun placeShips(gameId: String, playerToken: String, placements: List<ShipPlacement>): Game {
         val game = gameService.getGame(gameId)
+            ?: throw IllegalArgumentException("Game not found: $gameId")
         require(game.status == GameStatus.PLACING_SHIPS) {
             "Cannot place ships in game with status ${game.status}"
         }
+
+        val playerNumber = resolvePlayerNumber(game, playerToken)
 
         val placedShips = placements.map { placement ->
             PlacedShip(
@@ -29,14 +32,41 @@ class PlacementService @Inject constructor(
 
         validatePlacements(placedShips)
 
-        val updatedBoard = game.playerBoard.copy(ships = placedShips)
-        val updatedGame = game.copy(
-            playerBoard = updatedBoard,
-            status = if (updatedBoard.allShipsPlaced()) GameStatus.IN_PROGRESS else game.status,
-            updatedAt = System.currentTimeMillis()
+        val playerState = if (playerNumber == 1) game.player1 else game.player2
+        require(!playerState.shipsPlaced) {
+            "Ships already placed for player $playerNumber"
+        }
+
+        val updatedBoard = playerState.board.copy(ships = placedShips)
+        val updatedPlayerState = playerState.copy(
+            board = updatedBoard,
+            shipsPlaced = updatedBoard.allShipsPlaced()
         )
-        gameService.saveGame(updatedGame)
-        return updatedGame
+
+        val updatedGame = if (playerNumber == 1) {
+            game.copy(player1 = updatedPlayerState)
+        } else {
+            game.copy(player2 = updatedPlayerState)
+        }
+
+        // Transition to IN_PROGRESS when both players have placed ships
+        val bothPlaced = updatedGame.player1.shipsPlaced && updatedGame.player2.shipsPlaced
+        val finalGame = if (bothPlaced) {
+            updatedGame.copy(status = GameStatus.IN_PROGRESS)
+        } else {
+            updatedGame
+        }
+
+        gameService.saveGame(finalGame)
+        return finalGame
+    }
+
+    private fun resolvePlayerNumber(game: Game, token: String): Int {
+        return when (token) {
+            game.player1Token -> 1
+            game.player2Token -> 2
+            else -> throw IllegalArgumentException("Invalid player token")
+        }
     }
 
     private fun validatePlacements(ships: List<PlacedShip>) {

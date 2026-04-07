@@ -49,9 +49,6 @@ tasks.shadowJar {
     archiveClassifier.set("all")
     archiveVersion.set("")
     mergeServiceFiles()
-    dependencies {
-        exclude(dependency("com.google.code.gson:gson"))
-    }
     exclude("co/amazensolutions/battleship/LocalContext*")
     exclude("co/amazensolutions/battleship/LocalRunnerKt*")
 }

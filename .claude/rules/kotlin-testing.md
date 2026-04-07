@@ -28,6 +28,10 @@ Use `slot<T>()` captures for request parameter assertions.
 
 For Guice services: use the test constructor to inject mocks directly, bypassing the Guice module.
 
+Service tests mock at the DynamoDB client level (`DynamoDbTable`), NOT at the inter-service level.
+Let services interact naturally so the serialization boundary (Game ↔ GameRecord JSON) is tested.
+Only mock a service dependency if the test would become unwieldy (e.g. AiService in FiringServiceTest).
+
 Tests MUST use mocked DynamoDB clients. NEVER call `DynamoDbClient.create()` in tests — it
 will attempt real AWS connections and fail or hit production data.
 

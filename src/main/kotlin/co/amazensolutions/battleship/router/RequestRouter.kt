@@ -15,7 +15,7 @@ import co.amazensolutions.battleship.service.PlacementService
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.inject.Inject
 import com.google.inject.Singleton
 
@@ -26,12 +26,12 @@ class RequestRouter @Inject constructor(
     private val firingService: FiringService,
     private val aiService: AiService
 ) {
-    private val gson = Gson()
+    private val gson = GsonBuilder().create()
 
     private val corsHeaders = mapOf(
         "Access-Control-Allow-Origin" to "*",
         "Access-Control-Allow-Methods" to "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers" to "Content-Type,Authorization",
+        "Access-Control-Allow-Headers" to "Content-Type,X-Player-Token",
         "Content-Type" to "application/json"
     )
 
@@ -46,7 +46,8 @@ class RequestRouter @Inject constructor(
             when {
                 method == "OPTIONS" -> response(200, "")
                 method == "POST" && path == "/games" -> createGame(input)
-                method == "GET" && path.matches(Regex("/games/[^/]+")) -> getGame(input)
+                method == "GET" && path.matches(Regex("/games/[^/]+/state")) -> getGameState(input)
+                method == "GET" && path == "/games/history" -> getHistory()
                 method == "POST" && path.matches(Regex("/games/[^/]+/ships")) -> placeShips(input)
                 method == "POST" && path.matches(Regex("/games/[^/]+/fire")) -> fire(input)
                 method == "DELETE" && path.matches(Regex("/games/[^/]+")) -> deleteGame(input)
@@ -75,53 +76,78 @@ class RequestRouter @Inject constructor(
         return response(201, gson.toJson(responseBody))
     }
 
-    private fun getGame(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
-        val gameId = extractGameId(input.path)
+    private fun getGameState(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
+        val gameId = extractPathParam(input.path, "/state")
+        val playerToken = requirePlayerToken(input)
         val game = gameService.getGame(gameId)
+            ?: return response(404, gson.toJson(ErrorResponse("Game not found", "NOT_FOUND")))
+
+        val playerNumber = when (playerToken) {
+            game.player1Token -> 1
+            game.player2Token -> 2
+            else -> return response(403, gson.toJson(ErrorResponse("Invalid player token", "FORBIDDEN")))
+        }
+
+        val playerBoard = if (playerNumber == 1) game.player1.board else game.player2.board
+        val opponentBoard = if (playerNumber == 1) game.player2.board else game.player1.board
+
         val responseBody = GameStateResponse(
             gameId = game.gameId,
             status = game.status,
             mode = game.mode,
             playerBoard = BoardView(
-                ships = game.playerBoard.ships.map { ship ->
-                    ShipView(ship.type, ship.origin, ship.orientation, ship.isSunk(game.playerBoard.hits))
+                ships = playerBoard.ships.map { ship ->
+                    ShipView(ship.type, ship.origin, ship.orientation, ship.isSunk(playerBoard.hits))
                 },
-                shots = game.playerBoard.shots.toList(),
-                hits = game.playerBoard.hits.toList()
+                shots = playerBoard.shots.toList(),
+                hits = playerBoard.hits.toList()
             ),
             opponentBoard = BoardView(
                 ships = emptyList(),
-                shots = game.opponentBoard.shots.toList(),
-                hits = game.opponentBoard.hits.toList()
+                shots = opponentBoard.shots.toList(),
+                hits = opponentBoard.hits.toList()
             ),
-            currentTurn = game.currentTurn,
-            winnerId = game.winnerId
+            currentTurn = if (game.currentTurn == playerNumber) "you" else "opponent",
+            winnerId = game.winner?.let { if (it == playerNumber) "you" else "opponent" }
         )
         return response(200, gson.toJson(responseBody))
     }
 
+    private fun getHistory(): APIGatewayProxyResponseEvent {
+        val games = gameService.listCompletedGames()
+        return response(200, gson.toJson(games.map { mapOf("gameId" to it.gameId, "mode" to it.mode, "winner" to it.winner) }))
+    }
+
     private fun placeShips(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
-        val gameId = extractGameId(input.path.removeSuffix("/ships"))
+        val gameId = extractPathParam(input.path, "/ships")
+        val playerToken = requirePlayerToken(input)
         val request = gson.fromJson(input.body, PlaceShipsRequest::class.java)
-        val game = placementService.placeShips(gameId, request.ships)
+        val game = placementService.placeShips(gameId, playerToken, request.ships)
         return response(200, gson.toJson(mapOf("gameId" to game.gameId, "status" to game.status)))
     }
 
     private fun fire(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
-        val gameId = extractGameId(input.path.removeSuffix("/fire"))
+        val gameId = extractPathParam(input.path, "/fire")
+        val playerToken = requirePlayerToken(input)
         val request = gson.fromJson(input.body, FireRequest::class.java)
-        val result = firingService.fire(gameId, request.row, request.col)
+        val result = firingService.fire(gameId, playerToken, request.row, request.col)
         return response(200, gson.toJson(result))
     }
 
     private fun deleteGame(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
-        val gameId = extractGameId(input.path)
+        val gameId = input.path.split("/").last { it.isNotEmpty() }
         gameService.deleteGame(gameId)
         return response(204, "")
     }
 
-    private fun extractGameId(path: String): String {
-        return path.split("/").last { it.isNotEmpty() }
+    private fun extractPathParam(path: String, suffix: String): String {
+        val trimmed = path.removeSuffix(suffix)
+        return trimmed.split("/").last { it.isNotEmpty() }
+    }
+
+    private fun requirePlayerToken(input: APIGatewayProxyRequestEvent): String {
+        return input.headers?.get("X-Player-Token")
+            ?: throw IllegalArgumentException("X-Player-Token header is required")
     }
 
     private fun response(statusCode: Int, body: String): APIGatewayProxyResponseEvent {

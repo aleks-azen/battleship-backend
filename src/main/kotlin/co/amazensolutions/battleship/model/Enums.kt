@@ -6,10 +6,9 @@ enum class GameMode {
 }
 
 enum class GameStatus {
-    CREATED,
     PLACING_SHIPS,
     IN_PROGRESS,
-    FINISHED
+    COMPLETED
 }
 
 enum class Orientation {

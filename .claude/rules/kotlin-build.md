@@ -10,7 +10,7 @@ Use `com.gradleup.shadow` plugin (NOT the old `com.github.johnrengelman.shadow`)
 
 Configure exclusions:
 - Exclude `LocalRunner` and `LocalContext` classes from production JAR
-- Exclude dev-only dependencies (e.g. Gson if only used by LocalRunner)
+- Gson is a production dependency (used by RequestRouter for JSON serialization) — do NOT exclude it from the shadow JAR
 - Always call `mergeServiceFiles()` for AWS SDK service loader files
 
 ```kotlin

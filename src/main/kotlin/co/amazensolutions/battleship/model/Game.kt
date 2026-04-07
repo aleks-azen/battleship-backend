@@ -4,10 +4,12 @@ data class Game(
     val gameId: String,
     val mode: GameMode,
     val status: GameStatus,
-    val playerBoard: Board = Board(),
-    val opponentBoard: Board = Board(),
-    val currentTurn: String = "player",
-    val winnerId: String? = null,
+    val player1: PlayerState = PlayerState(),
+    val player2: PlayerState = PlayerState(),
+    val currentTurn: Int = 1,
+    val player1Token: String,
+    val player2Token: String,
+    val winner: Int? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
