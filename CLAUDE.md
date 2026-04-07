@@ -29,11 +29,12 @@ Kotlin Lambda (JVM 21) that handles all Battleship game logic via API Gateway pr
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | /games | Create new game |
-| GET | /games/{id} | Get game state |
-| POST | /games/{id}/ships | Place ships |
-| POST | /games/{id}/fire | Fire a shot |
-| DELETE | /games/{id} | Delete game |
+| POST | /games | Create new game (returns gameId + playerToken) |
+| POST | /games/{id}/join | Join multiplayer game (returns playerToken) |
+| POST | /games/{id}/ships | Place ships (requires X-Player-Token) |
+| POST | /games/{id}/fire | Fire a shot (requires X-Player-Token) |
+| GET | /games/{id}/state | Get game state filtered by player token |
+| GET | /games/history | List completed games |
 
 ## Dependencies
 

@@ -22,11 +22,14 @@ Service tests are the priority. Handler/router tests only verify delegation.
 
 ## Mocking
 
-Mock at SDK client interface level (`DynamoDbClient`, `DynamoDbEnhancedClient`).
+Mock at SDK client interface level (`DynamoDbClient`, `DynamoDbEnhancedClient`, `DynamoDbTable`).
 Use `every` / `verify` (sync clients, not suspend).
 Use `slot<T>()` captures for request parameter assertions.
 
 For Guice services: use the test constructor to inject mocks directly, bypassing the Guice module.
+
+Tests MUST use mocked DynamoDB clients. NEVER call `DynamoDbClient.create()` in tests — it
+will attempt real AWS connections and fail or hit production data.
 
 ## Assertions
 
