@@ -7,7 +7,9 @@ import com.google.inject.Singleton
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema
+import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
+import java.net.URI
 
 class BattleshipModule : AbstractModule() {
 
@@ -17,7 +19,17 @@ class BattleshipModule : AbstractModule() {
 
     @Provides
     @Singleton
-    fun dynamoDbClient(): DynamoDbClient = DynamoDbClient.create()
+    fun dynamoDbClient(): DynamoDbClient {
+        val endpoint = System.getenv("DYNAMODB_ENDPOINT")
+        return if (endpoint != null) {
+            DynamoDbClient.builder()
+                .endpointOverride(URI(endpoint))
+                .region(Region.US_EAST_1)
+                .build()
+        } else {
+            DynamoDbClient.create()
+        }
+    }
 
     @Provides
     @Singleton
