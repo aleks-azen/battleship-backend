@@ -89,6 +89,17 @@ data class GameHistoryEntry(
     val moveCount: Int
 )
 
+data class SpectatorGameStateResponse(
+    val gameId: String,
+    val status: GameStatus,
+    val mode: GameMode,
+    val player1Board: BoardView,
+    val player2Board: BoardView,
+    val currentTurn: Int,
+    val winnerId: Int? = null,
+    val updatedAt: Long = 0
+)
+
 data class ErrorResponse(
     val message: String,
     val code: String

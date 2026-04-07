@@ -1,5 +1,6 @@
 package co.amazensolutions.battleship.router
 
+import co.amazensolutions.battleship.model.Game
 import co.amazensolutions.battleship.model.CreateGameRequest
 import co.amazensolutions.battleship.model.CreateGameResponse
 import co.amazensolutions.battleship.model.ErrorResponse
@@ -9,6 +10,7 @@ import co.amazensolutions.battleship.model.FireResponseWithAi
 import co.amazensolutions.battleship.model.GameHistoryEntry
 import co.amazensolutions.battleship.model.GameMode
 import co.amazensolutions.battleship.model.GameStateResponse
+import co.amazensolutions.battleship.model.SpectatorGameStateResponse
 import co.amazensolutions.battleship.model.GameStatus
 import co.amazensolutions.battleship.model.BoardView
 import co.amazensolutions.battleship.model.JoinGameResponse
@@ -138,16 +140,30 @@ class RequestRouter @Inject constructor(
 
     private fun getGameState(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
         val gameId = extractPathParam(input.path, "/state")
-        val playerToken = requirePlayerToken(input)
+        val playerToken = optionalPlayerToken(input)
         val game = gameService.getGame(gameId)
             ?: return response(404, gson.toJson(ErrorResponse("Game not found", "NOT_FOUND")))
 
-        val playerNumber = try {
-            game.resolvePlayerNumber(playerToken)
-        } catch (_: IllegalArgumentException) {
-            return response(403, gson.toJson(ErrorResponse("Invalid player token", "FORBIDDEN")))
+        val playerNumber = playerToken?.let {
+            try {
+                game.resolvePlayerNumber(it)
+            } catch (_: IllegalArgumentException) {
+                null
+            }
         }
 
+        if (playerNumber != null) {
+            return getPlayerGameState(game, playerNumber, input)
+        }
+
+        return getSpectatorGameState(game, input)
+    }
+
+    private fun getPlayerGameState(
+        game: Game,
+        playerNumber: Int,
+        input: APIGatewayProxyRequestEvent
+    ): APIGatewayProxyResponseEvent {
         val since = input.queryStringParameters?.get("since")?.toLongOrNull()
         if (since != null && game.updatedAt < since) {
             return response(304, "")
@@ -177,6 +193,82 @@ class RequestRouter @Inject constructor(
             updatedAt = game.updatedAt
         )
         return response(200, gson.toJson(responseBody))
+    }
+
+    private fun getSpectatorGameState(
+        game: Game,
+        input: APIGatewayProxyRequestEvent
+    ): APIGatewayProxyResponseEvent {
+        val since = input.queryStringParameters?.get("since")?.toLongOrNull()
+        if (since != null && game.updatedAt < since) {
+            return response(304, "")
+        }
+
+        return when (game.status) {
+            GameStatus.COMPLETED -> {
+                val p1Board = game.player1.board
+                val p2Board = game.player2.board
+                val responseBody = SpectatorGameStateResponse(
+                    gameId = game.gameId,
+                    status = game.status,
+                    mode = game.mode,
+                    player1Board = BoardView(
+                        ships = p1Board.ships.map { ship ->
+                            ShipView(ship.type, ship.origin, ship.orientation, ship.isSunk(p1Board.hits))
+                        },
+                        shots = p1Board.shots.toList(),
+                        hits = p1Board.hits.toList()
+                    ),
+                    player2Board = BoardView(
+                        ships = p2Board.ships.map { ship ->
+                            ShipView(ship.type, ship.origin, ship.orientation, ship.isSunk(p2Board.hits))
+                        },
+                        shots = p2Board.shots.toList(),
+                        hits = p2Board.hits.toList()
+                    ),
+                    currentTurn = game.currentTurn,
+                    winnerId = game.winner,
+                    updatedAt = game.updatedAt
+                )
+                response(200, gson.toJson(responseBody))
+            }
+            GameStatus.IN_PROGRESS -> {
+                val p1Board = game.player1.board
+                val p2Board = game.player2.board
+                val responseBody = SpectatorGameStateResponse(
+                    gameId = game.gameId,
+                    status = game.status,
+                    mode = game.mode,
+                    player1Board = BoardView(
+                        ships = emptyList(),
+                        shots = p1Board.shots.toList(),
+                        hits = p1Board.hits.toList()
+                    ),
+                    player2Board = BoardView(
+                        ships = emptyList(),
+                        shots = p2Board.shots.toList(),
+                        hits = p2Board.hits.toList()
+                    ),
+                    currentTurn = game.currentTurn,
+                    winnerId = null,
+                    updatedAt = game.updatedAt
+                )
+                response(200, gson.toJson(responseBody))
+            }
+            GameStatus.PLACING_SHIPS -> {
+                val responseBody = SpectatorGameStateResponse(
+                    gameId = game.gameId,
+                    status = game.status,
+                    mode = game.mode,
+                    player1Board = BoardView(ships = emptyList(), shots = emptyList(), hits = emptyList()),
+                    player2Board = BoardView(ships = emptyList(), shots = emptyList(), hits = emptyList()),
+                    currentTurn = game.currentTurn,
+                    winnerId = null,
+                    updatedAt = game.updatedAt
+                )
+                response(200, gson.toJson(responseBody))
+            }
+        }
     }
 
     private fun getHistory(): APIGatewayProxyResponseEvent {
@@ -256,6 +348,10 @@ class RequestRouter @Inject constructor(
         val headers = input.headers ?: throw IllegalArgumentException("X-Player-Token header is required")
         return headers.entries.firstOrNull { it.key.equals("X-Player-Token", ignoreCase = true) }?.value
             ?: throw IllegalArgumentException("X-Player-Token header is required")
+    }
+
+    private fun optionalPlayerToken(input: APIGatewayProxyRequestEvent): String? {
+        return input.headers?.entries?.firstOrNull { it.key.equals("X-Player-Token", ignoreCase = true) }?.value
     }
 
     private fun response(statusCode: Int, body: String): APIGatewayProxyResponseEvent {
