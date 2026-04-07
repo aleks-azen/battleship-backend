@@ -184,11 +184,11 @@ class RequestRouter @Inject constructor(
         val entries = games.map { game ->
             GameHistoryEntry(
                 gameId = game.gameId,
-                mode = game.mode.name,
+                mode = game.mode,
                 winner = game.winner,
                 createdAt = game.createdAt,
                 updatedAt = game.updatedAt,
-                moveCount = game.player1.board.shots.size + game.player2.board.shots.size
+                moveCount = game.totalMoveCount()
             )
         }.sortedByDescending { it.createdAt }
         return response(200, gson.toJson(entries))

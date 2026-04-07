@@ -82,7 +82,7 @@ data class FireResult(
 
 data class GameHistoryEntry(
     val gameId: String,
-    val mode: String,
+    val mode: GameMode,
     val winner: Int?,
     val createdAt: Long,
     val updatedAt: Long,

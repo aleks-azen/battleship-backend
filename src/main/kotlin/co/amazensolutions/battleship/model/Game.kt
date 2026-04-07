@@ -31,4 +31,7 @@ data class Game(
 
     fun isAiPlayer(playerNumber: Int): Boolean =
         mode == GameMode.SINGLE_PLAYER && playerNumber == 2
+
+    fun totalMoveCount(): Int =
+        player1.board.shots.size + player2.board.shots.size
 }
