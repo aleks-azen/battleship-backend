@@ -6,6 +6,7 @@ import co.amazensolutions.battleship.model.ErrorResponse
 import co.amazensolutions.battleship.model.FireRequest
 import co.amazensolutions.battleship.model.FireResponse
 import co.amazensolutions.battleship.model.FireResponseWithAi
+import co.amazensolutions.battleship.model.GameHistoryEntry
 import co.amazensolutions.battleship.model.GameMode
 import co.amazensolutions.battleship.model.GameStateResponse
 import co.amazensolutions.battleship.model.GameStatus
@@ -124,7 +125,7 @@ class RequestRouter @Inject constructor(
         require(game.mode == GameMode.MULTIPLAYER) {
             "Cannot join a single player game"
         }
-        require(game.status == GameStatus.PLACING_SHIPS) {
+        check(game.status == GameStatus.PLACING_SHIPS) {
             "Game is not accepting new players"
         }
 
@@ -180,7 +181,17 @@ class RequestRouter @Inject constructor(
 
     private fun getHistory(): APIGatewayProxyResponseEvent {
         val games = gameService.listCompletedGames()
-        return response(200, gson.toJson(games.map { mapOf("gameId" to it.gameId, "mode" to it.mode, "winner" to it.winner) }))
+        val entries = games.map { game ->
+            GameHistoryEntry(
+                gameId = game.gameId,
+                mode = game.mode.name,
+                winner = game.winner,
+                createdAt = game.createdAt,
+                updatedAt = game.updatedAt,
+                moveCount = game.player1.board.shots.size + game.player2.board.shots.size
+            )
+        }.sortedByDescending { it.createdAt }
+        return response(200, gson.toJson(entries))
     }
 
     private fun placeShips(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {

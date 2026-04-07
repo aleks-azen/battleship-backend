@@ -80,6 +80,15 @@ data class FireResult(
     val playerNumber: Int
 )
 
+data class GameHistoryEntry(
+    val gameId: String,
+    val mode: String,
+    val winner: Int?,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val moveCount: Int
+)
+
 data class ErrorResponse(
     val message: String,
     val code: String
