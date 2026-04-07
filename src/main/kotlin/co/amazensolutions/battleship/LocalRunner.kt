@@ -47,8 +47,10 @@ private fun handleRequest(exchange: HttpExchange, handler: BattleshipHandler) {
     event.httpMethod = method
     event.path = path
 
-    // Headers
-    val headers = mutableMapOf<String, String>()
+    // Headers — use case-insensitive map because JDK HttpServer normalizes
+    // header names (e.g. "X-Player-Token" → "X-player-token") but the
+    // Lambda handler does case-sensitive lookups.
+    val headers = java.util.TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
     exchange.requestHeaders.forEach { (key, values) ->
         if (values.isNotEmpty()) {
             headers[key] = values.first()

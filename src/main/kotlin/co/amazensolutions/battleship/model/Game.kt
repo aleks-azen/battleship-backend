@@ -10,6 +10,7 @@ data class Game(
     val player1Token: String,
     val player2Token: String,
     val winner: Int? = null,
+    val aiState: AiState? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {

@@ -197,6 +197,12 @@ class RequestRouter @Inject constructor(
             if (currentGame.mode == GameMode.SINGLE_PLAYER && currentGame.currentTurn == 2) {
                 val target = aiService.chooseAiTarget(currentGame)
                 aiResult = firingService.fire(gameId, currentGame.player2Token, target.row, target.col, isServerAiCall = true)
+
+                val gameAfterShot = gameService.getGame(gameId)!!
+                val updatedGame = aiService.updateAiStateAfterShot(
+                    gameAfterShot, target, aiResult.result, aiResult.sunkShip
+                )
+                gameService.saveGame(updatedGame)
             }
         }
 
