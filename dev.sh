@@ -5,13 +5,14 @@ echo "Starting DynamoDB Local..."
 docker compose up -d
 
 echo "Waiting for DynamoDB Local..."
-until aws dynamodb list-tables --endpoint-url http://localhost:8000 --no-cli-pager >/dev/null 2>&1; do
+until aws dynamodb list-tables --endpoint-url http://localhost:8000 --region us-east-1 --no-cli-pager >/dev/null 2>&1; do
   sleep 1
 done
 
 echo "Creating table (if not exists)..."
 aws dynamodb create-table \
   --endpoint-url http://localhost:8000 \
+  --region us-east-1 \
   --table-name battleship-games-beta \
   --attribute-definitions AttributeName=gameId,AttributeType=S \
   --key-schema AttributeName=gameId,KeyType=HASH \
