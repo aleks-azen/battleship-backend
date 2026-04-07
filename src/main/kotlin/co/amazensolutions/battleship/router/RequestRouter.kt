@@ -4,8 +4,12 @@ import co.amazensolutions.battleship.model.CreateGameRequest
 import co.amazensolutions.battleship.model.CreateGameResponse
 import co.amazensolutions.battleship.model.ErrorResponse
 import co.amazensolutions.battleship.model.FireRequest
+import co.amazensolutions.battleship.model.FireResponseWithAi
+import co.amazensolutions.battleship.model.GameMode
 import co.amazensolutions.battleship.model.GameStateResponse
+import co.amazensolutions.battleship.model.GameStatus
 import co.amazensolutions.battleship.model.BoardView
+import co.amazensolutions.battleship.model.JoinGameResponse
 import co.amazensolutions.battleship.model.PlaceShipsRequest
 import co.amazensolutions.battleship.model.ShipView
 import co.amazensolutions.battleship.service.AiService
@@ -18,6 +22,8 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.google.gson.GsonBuilder
 import com.google.inject.Inject
 import com.google.inject.Singleton
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
 
 @Singleton
 class RequestRouter @Inject constructor(
@@ -27,11 +33,13 @@ class RequestRouter @Inject constructor(
     private val aiService: AiService
 ) {
     private val gson = GsonBuilder().create()
+    private val gameLocks = ConcurrentHashMap<String, ReentrantLock>()
 
     companion object {
         private val GAME_STATE_PATTERN = Regex("/games/[^/]+/state")
         private val GAME_SHIPS_PATTERN = Regex("/games/[^/]+/ships")
         private val GAME_FIRE_PATTERN = Regex("/games/[^/]+/fire")
+        private val GAME_JOIN_PATTERN = Regex("/games/[^/]+/join")
         private val GAME_ID_PATTERN = Regex("/games/[^/]+")
     }
 
@@ -53,10 +61,11 @@ class RequestRouter @Inject constructor(
             when {
                 method == "OPTIONS" -> response(200, "")
                 method == "POST" && path == "/games" -> createGame(input)
+                method == "POST" && path.matches(GAME_JOIN_PATTERN) -> withGameLock(input, "/join") { joinGame(it) }
+                method == "POST" && path.matches(GAME_SHIPS_PATTERN) -> withGameLock(input, "/ships") { placeShips(it) }
+                method == "POST" && path.matches(GAME_FIRE_PATTERN) -> withGameLock(input, "/fire") { fire(it) }
                 method == "GET" && path.matches(GAME_STATE_PATTERN) -> getGameState(input)
                 method == "GET" && path == "/games/history" -> getHistory()
-                method == "POST" && path.matches(GAME_SHIPS_PATTERN) -> placeShips(input)
-                method == "POST" && path.matches(GAME_FIRE_PATTERN) -> fire(input)
                 method == "DELETE" && path.matches(GAME_ID_PATTERN) -> deleteGame(input)
                 else -> response(404, gson.toJson(ErrorResponse("Route not found", "NOT_FOUND")))
             }
@@ -72,15 +81,57 @@ class RequestRouter @Inject constructor(
         }
     }
 
+    private fun withGameLock(
+        input: APIGatewayProxyRequestEvent,
+        suffix: String,
+        handler: (APIGatewayProxyRequestEvent) -> APIGatewayProxyResponseEvent
+    ): APIGatewayProxyResponseEvent {
+        val gameId = extractPathParam(input.path, suffix)
+        val lock = gameLocks.computeIfAbsent(gameId) { ReentrantLock() }
+        lock.lock()
+        try {
+            return handler(input)
+        } finally {
+            lock.unlock()
+        }
+    }
+
     private fun createGame(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
         val request = gson.fromJson(input.body, CreateGameRequest::class.java)
-        val game = gameService.createGame(request.mode)
+        var game = gameService.createGame(request.mode)
+
+        if (request.mode == GameMode.SINGLE_PLAYER) {
+            game = aiService.placeAiShips(game)
+            gameService.saveGame(game)
+        }
+
         val responseBody = CreateGameResponse(
             gameId = game.gameId,
+            playerToken = game.player1Token,
+            playerNumber = 1,
             status = game.status,
             mode = game.mode
         )
         return response(201, gson.toJson(responseBody))
+    }
+
+    private fun joinGame(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
+        val gameId = extractPathParam(input.path, "/join")
+        val game = gameService.getGame(gameId)
+            ?: return response(404, gson.toJson(ErrorResponse("Game not found", "NOT_FOUND")))
+
+        require(game.mode == GameMode.MULTIPLAYER) {
+            "Cannot join a single player game"
+        }
+        require(game.status == GameStatus.PLACING_SHIPS) {
+            "Game is not accepting new players"
+        }
+
+        val responseBody = JoinGameResponse(
+            playerToken = game.player2Token,
+            playerNumber = 2
+        )
+        return response(200, gson.toJson(responseBody))
     }
 
     private fun getGameState(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
@@ -137,8 +188,28 @@ class RequestRouter @Inject constructor(
         val gameId = extractPathParam(input.path, "/fire")
         val playerToken = requirePlayerToken(input)
         val request = gson.fromJson(input.body, FireRequest::class.java)
-        val result = firingService.fire(gameId, playerToken, request.row, request.col)
-        return response(200, gson.toJson(result))
+        val humanResult = firingService.fire(gameId, playerToken, request.row, request.col)
+
+        // For single-player, AI fires immediately after human (if game isn't over)
+        var aiResult: co.amazensolutions.battleship.model.FireResponse? = null
+        if (!humanResult.gameOver) {
+            val currentGame = gameService.getGame(gameId)!!
+            if (currentGame.mode == GameMode.SINGLE_PLAYER && currentGame.currentTurn == 2) {
+                val (updatedGame, aiFireResult) = aiService.aiTurn(currentGame)
+                gameService.saveGame(updatedGame)
+                aiResult = aiFireResult
+            }
+        }
+
+        val responseBody = FireResponseWithAi(
+            result = humanResult.result,
+            coordinate = humanResult.coordinate,
+            sunkShip = humanResult.sunkShip,
+            gameOver = humanResult.gameOver || (aiResult?.gameOver == true),
+            winnerId = humanResult.winnerId ?: aiResult?.winnerId,
+            aiResult = aiResult
+        )
+        return response(200, gson.toJson(responseBody))
     }
 
     private fun deleteGame(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {

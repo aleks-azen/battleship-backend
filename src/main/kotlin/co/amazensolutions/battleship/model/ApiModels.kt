@@ -6,8 +6,15 @@ data class CreateGameRequest(
 
 data class CreateGameResponse(
     val gameId: String,
+    val playerToken: String,
+    val playerNumber: Int,
     val status: GameStatus,
     val mode: GameMode
+)
+
+data class JoinGameResponse(
+    val playerToken: String,
+    val playerNumber: Int
 )
 
 data class PlaceShipsRequest(
@@ -55,6 +62,15 @@ data class ShipView(
     val origin: Coordinate,
     val orientation: Orientation,
     val sunk: Boolean
+)
+
+data class FireResponseWithAi(
+    val result: ShotResult,
+    val coordinate: Coordinate,
+    val sunkShip: ShipType? = null,
+    val gameOver: Boolean = false,
+    val winnerId: String? = null,
+    val aiResult: FireResponse? = null
 )
 
 data class ErrorResponse(

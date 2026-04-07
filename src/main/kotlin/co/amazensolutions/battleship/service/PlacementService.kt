@@ -5,6 +5,7 @@ import co.amazensolutions.battleship.model.Game
 import co.amazensolutions.battleship.model.GameStatus
 import co.amazensolutions.battleship.model.PlacedShip
 import co.amazensolutions.battleship.model.ShipPlacement
+import co.amazensolutions.battleship.model.ShipType
 import com.google.inject.Inject
 import com.google.inject.Singleton
 
@@ -64,9 +65,13 @@ class PlacementService @Inject constructor(
     }
 
     private fun validatePlacements(ships: List<PlacedShip>) {
-        val types = ships.map { it.type }
-        require(types.distinct().size == types.size) {
-            "Duplicate ship types are not allowed"
+        val requiredTypes = ShipType.entries.toSet()
+        val placedTypes = ships.map { it.type }.toSet()
+        require(ships.size == requiredTypes.size) {
+            "Exactly ${requiredTypes.size} ships required, got ${ships.size}"
+        }
+        require(placedTypes == requiredTypes) {
+            "Must place one of each ship type. Missing: ${requiredTypes - placedTypes}"
         }
 
         val allCells = mutableSetOf<Coordinate>()
