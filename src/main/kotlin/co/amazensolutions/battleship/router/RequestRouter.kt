@@ -148,7 +148,7 @@ class RequestRouter @Inject constructor(
         }
 
         val since = input.queryStringParameters?.get("since")?.toLongOrNull()
-        if (since != null && game.updatedAt <= since) {
+        if (since != null && game.updatedAt < since) {
             return response(304, "")
         }
 
