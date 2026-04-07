@@ -9,6 +9,7 @@ data class Game(
     val currentTurn: Int = 1,
     val player1Token: String,
     val player2Token: String,
+    val player2Joined: Boolean = false,
     val winner: Int? = null,
     val aiState: AiState? = null,
     val createdAt: Long = System.currentTimeMillis(),

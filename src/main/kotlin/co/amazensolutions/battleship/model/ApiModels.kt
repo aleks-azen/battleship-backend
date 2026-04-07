@@ -49,6 +49,7 @@ data class GameStateResponse(
     val opponentBoard: BoardView,
     val currentTurn: String,
     val winnerId: String? = null,
+    val opponentJoined: Boolean = false,
     val updatedAt: Long = 0
 )
 

@@ -131,6 +131,9 @@ class RequestRouter @Inject constructor(
             "Game is not accepting new players"
         }
 
+        val updatedGame = game.copy(player2Joined = true)
+        gameService.saveGame(updatedGame)
+
         val responseBody = JoinGameResponse(
             playerToken = game.player2Token,
             playerNumber = 2
@@ -190,6 +193,7 @@ class RequestRouter @Inject constructor(
             ),
             currentTurn = toPerspective(game.currentTurn, playerNumber),
             winnerId = game.winner?.let { toPerspective(it, playerNumber) },
+            opponentJoined = if (playerNumber == 1) game.player2Joined else true,
             updatedAt = game.updatedAt
         )
         return response(200, gson.toJson(responseBody))
