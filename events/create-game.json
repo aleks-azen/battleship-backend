@@ -1,0 +1,20 @@
+{
+  "httpMethod": "POST",
+  "path": "/games",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": "{\"mode\":\"SINGLE_PLAYER\"}",
+  "isBase64Encoded": false,
+  "requestContext": {
+    "accountId": "123456789012",
+    "resourceId": "abc123",
+    "stage": "dev",
+    "requestId": "test-request-id",
+    "identity": {
+      "sourceIp": "127.0.0.1"
+    },
+    "httpMethod": "POST",
+    "path": "/games"
+  }
+}
