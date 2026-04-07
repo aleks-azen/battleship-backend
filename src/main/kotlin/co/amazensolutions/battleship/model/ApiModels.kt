@@ -38,7 +38,7 @@ data class FireResponse(
     val coordinate: Coordinate,
     val sunkShip: ShipType? = null,
     val gameOver: Boolean = false,
-    val winnerId: String? = null
+    val winnerId: Int? = null
 )
 
 data class GameStateResponse(
@@ -49,7 +49,7 @@ data class GameStateResponse(
     val opponentBoard: BoardView,
     val currentTurn: String,
     val winnerId: String? = null,
-    val updatedAt: Long
+    val updatedAt: Long = 0
 )
 
 data class BoardView(
@@ -76,7 +76,8 @@ data class FireResponseWithAi(
 
 data class FireResult(
     val response: FireResponse,
-    val game: Game
+    val game: Game,
+    val playerNumber: Int
 )
 
 data class ErrorResponse(

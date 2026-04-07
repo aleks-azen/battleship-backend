@@ -39,7 +39,8 @@ class FiringService @Inject constructor(
                     result = ShotResult.ALREADY_SHOT,
                     coordinate = coordinate
                 ),
-                game = game
+                game = game,
+                playerNumber = playerNumber
             )
         }
 
@@ -75,9 +76,10 @@ class FiringService @Inject constructor(
                 coordinate = coordinate,
                 sunkShip = if (result == ShotResult.SUNK || result == ShotResult.GAME_OVER) hitShip?.type else null,
                 gameOver = gameOver,
-                winnerId = if (gameOver) playerNumber.toString() else null
+                winnerId = if (gameOver) playerNumber else null
             ),
-            game = updatedGame
+            game = updatedGame,
+            playerNumber = playerNumber
         )
     }
 }

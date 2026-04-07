@@ -171,8 +171,8 @@ class RequestRouter @Inject constructor(
                 shots = opponentBoard.shots.toList(),
                 hits = opponentBoard.hits.toList()
             ),
-            currentTurn = if (game.currentTurn == playerNumber) "you" else "opponent",
-            winnerId = game.winner?.let { if (it == playerNumber) "you" else "opponent" },
+            currentTurn = toPerspective(game.currentTurn, playerNumber),
+            winnerId = game.winner?.let { toPerspective(it, playerNumber) },
             updatedAt = game.updatedAt
         )
         return response(200, gson.toJson(responseBody))
@@ -197,8 +197,7 @@ class RequestRouter @Inject constructor(
         val request = gson.fromJson(input.body, FireRequest::class.java)
         val humanFireResult = firingService.fire(gameId, playerToken, request.row, request.col)
         val humanResponse = humanFireResult.response
-
-        val requestingPlayerNumber = humanFireResult.game.resolvePlayerNumber(playerToken)
+        val requestingPlayerNumber = humanFireResult.playerNumber
 
         var aiResponse: FireResponse? = null
         if (!humanResponse.gameOver) {
@@ -215,16 +214,15 @@ class RequestRouter @Inject constructor(
             }
         }
 
-        fun normalizeWinnerId(winnerId: String?): String? =
-            winnerId?.let { if (it == requestingPlayerNumber.toString()) "you" else "opponent" }
+        val rawWinnerId = humanResponse.winnerId ?: aiResponse?.winnerId
 
         val responseBody = FireResponseWithAi(
             result = humanResponse.result,
             coordinate = humanResponse.coordinate,
             sunkShip = humanResponse.sunkShip,
             gameOver = humanResponse.gameOver || (aiResponse?.gameOver == true),
-            winnerId = normalizeWinnerId(humanResponse.winnerId ?: aiResponse?.winnerId),
-            aiResult = aiResponse?.copy(winnerId = normalizeWinnerId(aiResponse.winnerId))
+            winnerId = rawWinnerId?.let { toPerspective(it, requestingPlayerNumber) },
+            aiResult = aiResponse?.copy(winnerId = null)
         )
         return response(200, gson.toJson(responseBody))
     }
@@ -234,6 +232,9 @@ class RequestRouter @Inject constructor(
         gameService.deleteGame(gameId)
         return response(204, "")
     }
+
+    private fun toPerspective(value: Int, playerNumber: Int): String =
+        if (value == playerNumber) "you" else "opponent"
 
     private fun extractPathParam(path: String, suffix: String): String {
         val trimmed = path.removeSuffix(suffix)

@@ -245,6 +245,6 @@ class FiringServiceTest {
 
         assertTrue(result.gameOver)
         assertEquals(ShotResult.GAME_OVER, result.result)
-        assertEquals("1", result.winnerId)
+        assertEquals(1, result.winnerId)
     }
 }

@@ -29,7 +29,6 @@ class MultiplayerFlowTest {
     private lateinit var firingService: FiringService
     private val gson = GsonBuilder().create()
 
-    // In-memory store — single game per test
     private var latestRecord: GameRecord? = null
 
     @BeforeEach
@@ -121,7 +120,7 @@ class MultiplayerFlowTest {
             if (isLastShot) {
                 assertTrue(result.response.gameOver)
                 assertEquals(ShotResult.GAME_OVER, result.response.result)
-                assertEquals("1", result.response.winnerId)
+                assertEquals(1, result.response.winnerId)
             } else {
                 assertFalse(result.response.gameOver)
             }
