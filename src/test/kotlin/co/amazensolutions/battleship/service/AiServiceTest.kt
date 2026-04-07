@@ -9,31 +9,20 @@ import co.amazensolutions.battleship.model.Orientation
 import co.amazensolutions.battleship.model.PlacedShip
 import co.amazensolutions.battleship.model.PlayerState
 import co.amazensolutions.battleship.model.ShipType
-import co.amazensolutions.battleship.model.ShotResult
-import co.amazensolutions.battleship.model.persistence.GameRecord
-import com.google.gson.GsonBuilder
-import io.mockk.every
-import io.mockk.mockk
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AiServiceTest {
 
-    private lateinit var gamesTable: DynamoDbTable<GameRecord>
-    private lateinit var gameService: GameService
     private lateinit var aiService: AiService
 
     @BeforeEach
     fun setup() {
-        @Suppress("UNCHECKED_CAST")
-        gamesTable = mockk<DynamoDbTable<GameRecord>>(relaxed = true)
-        gameService = GameService(gamesTable)
-        aiService = AiService(gameService)
+        aiService = AiService()
     }
 
     @Test
@@ -100,7 +89,7 @@ class AiServiceTest {
     }
 
     @Test
-    fun `aiTurn fires at unshot coordinate`() {
+    fun `chooseAiTarget picks unshot coordinate`() {
         val p1Ships = listOf(
             PlacedShip(ShipType.DESTROYER, Coordinate(0, 0), Orientation.HORIZONTAL)
         )
@@ -112,27 +101,39 @@ class AiServiceTest {
             player2Token = "p2-ai",
             currentTurn = 2,
             player1 = PlayerState(board = Board(ships = p1Ships), shipsPlaced = true),
-            player2 = PlayerState(
-                board = Board(
-                    ships = listOf(PlacedShip(ShipType.DESTROYER, Coordinate(5, 5), Orientation.HORIZONTAL))
-                ),
-                shipsPlaced = true
-            )
+            player2 = PlayerState(shipsPlaced = true)
         )
 
-        val (updatedGame, response) = aiService.aiTurn(game)
+        val target = aiService.chooseAiTarget(game)
 
-        assertTrue(response.coordinate.row in 0..9)
-        assertTrue(response.coordinate.col in 0..9)
-        assertTrue(response.result in listOf(ShotResult.HIT, ShotResult.MISS, ShotResult.SUNK, ShotResult.GAME_OVER))
-        // Turn should switch back to player 1 (unless game over)
-        if (!response.gameOver) {
-            assertEquals(1, updatedGame.currentTurn)
-        }
+        assertTrue(target.row in 0..9)
+        assertTrue(target.col in 0..9)
+        assertTrue(target !in game.player1.board.shots)
     }
 
     @Test
-    fun `aiTurn rejects when not AI turn`() {
+    fun `chooseAiTarget avoids already-shot coordinates`() {
+        val allButOne = (0..9).flatMap { row -> (0..9).map { col -> Coordinate(row, col) } }
+            .filter { !(it.row == 5 && it.col == 5) }
+            .toSet()
+
+        val game = Game(
+            gameId = "test",
+            mode = GameMode.SINGLE_PLAYER,
+            status = GameStatus.IN_PROGRESS,
+            player1Token = "p1",
+            player2Token = "p2-ai",
+            currentTurn = 2,
+            player1 = PlayerState(board = Board(shots = allButOne), shipsPlaced = true),
+            player2 = PlayerState(shipsPlaced = true)
+        )
+
+        val target = aiService.chooseAiTarget(game)
+        assertEquals(Coordinate(5, 5), target)
+    }
+
+    @Test
+    fun `chooseAiTarget rejects when not AI turn`() {
         val game = Game(
             gameId = "test",
             mode = GameMode.SINGLE_PLAYER,
@@ -145,12 +146,12 @@ class AiServiceTest {
         )
 
         assertThrows<IllegalArgumentException> {
-            aiService.aiTurn(game)
+            aiService.chooseAiTarget(game)
         }
     }
 
     @Test
-    fun `aiTurn rejects when game not in progress`() {
+    fun `chooseAiTarget rejects when game not in progress`() {
         val game = Game(
             gameId = "test",
             mode = GameMode.SINGLE_PLAYER,
@@ -161,7 +162,7 @@ class AiServiceTest {
         )
 
         assertThrows<IllegalArgumentException> {
-            aiService.aiTurn(game)
+            aiService.chooseAiTarget(game)
         }
     }
 }

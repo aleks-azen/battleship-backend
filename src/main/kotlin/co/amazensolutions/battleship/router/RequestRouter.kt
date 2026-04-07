@@ -4,6 +4,7 @@ import co.amazensolutions.battleship.model.CreateGameRequest
 import co.amazensolutions.battleship.model.CreateGameResponse
 import co.amazensolutions.battleship.model.ErrorResponse
 import co.amazensolutions.battleship.model.FireRequest
+import co.amazensolutions.battleship.model.FireResponse
 import co.amazensolutions.battleship.model.FireResponseWithAi
 import co.amazensolutions.battleship.model.GameMode
 import co.amazensolutions.battleship.model.GameStateResponse
@@ -190,14 +191,12 @@ class RequestRouter @Inject constructor(
         val request = gson.fromJson(input.body, FireRequest::class.java)
         val humanResult = firingService.fire(gameId, playerToken, request.row, request.col)
 
-        // For single-player, AI fires immediately after human (if game isn't over)
-        var aiResult: co.amazensolutions.battleship.model.FireResponse? = null
+        var aiResult: FireResponse? = null
         if (!humanResult.gameOver) {
             val currentGame = gameService.getGame(gameId)!!
             if (currentGame.mode == GameMode.SINGLE_PLAYER && currentGame.currentTurn == 2) {
-                val (updatedGame, aiFireResult) = aiService.aiTurn(currentGame)
-                gameService.saveGame(updatedGame)
-                aiResult = aiFireResult
+                val target = aiService.chooseAiTarget(currentGame)
+                aiResult = firingService.fire(gameId, currentGame.player2Token, target.row, target.col, isServerAiCall = true)
             }
         }
 

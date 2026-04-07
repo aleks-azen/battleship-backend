@@ -12,7 +12,7 @@ class FiringService @Inject constructor(
     private val gameService: GameService
 ) {
 
-    fun fire(gameId: String, playerToken: String, row: Int, col: Int): FireResponse {
+    fun fire(gameId: String, playerToken: String, row: Int, col: Int, isServerAiCall: Boolean = false): FireResponse {
         val game = gameService.getGame(gameId)
             ?: throw IllegalArgumentException("Game not found: $gameId")
         require(game.status == GameStatus.IN_PROGRESS) {
@@ -20,8 +20,10 @@ class FiringService @Inject constructor(
         }
 
         val playerNumber = game.resolvePlayerNumber(playerToken)
-        require(!game.isAiPlayer(playerNumber)) {
-            "Cannot perform actions for AI player"
+        if (!isServerAiCall) {
+            require(!game.isAiPlayer(playerNumber)) {
+                "Cannot perform actions for AI player"
+            }
         }
         require(playerNumber == game.currentTurn) {
             "It is not your turn"
