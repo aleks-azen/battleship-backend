@@ -147,6 +147,11 @@ class RequestRouter @Inject constructor(
             return response(403, gson.toJson(ErrorResponse("Invalid player token", "FORBIDDEN")))
         }
 
+        val since = input.queryStringParameters?.get("since")?.toLongOrNull()
+        if (since != null && game.updatedAt <= since) {
+            return response(304, "")
+        }
+
         val playerBoard = game.playerState(playerNumber).board
         val opponentBoard = game.opponentState(playerNumber).board
 
@@ -236,7 +241,8 @@ class RequestRouter @Inject constructor(
     }
 
     private fun requirePlayerToken(input: APIGatewayProxyRequestEvent): String {
-        return input.headers?.get("X-Player-Token")
+        val headers = input.headers ?: throw IllegalArgumentException("X-Player-Token header is required")
+        return headers.entries.firstOrNull { it.key.equals("X-Player-Token", ignoreCase = true) }?.value
             ?: throw IllegalArgumentException("X-Player-Token header is required")
     }
 
