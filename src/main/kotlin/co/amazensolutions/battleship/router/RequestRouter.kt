@@ -167,7 +167,8 @@ class RequestRouter @Inject constructor(
                 hits = opponentBoard.hits.toList()
             ),
             currentTurn = if (game.currentTurn == playerNumber) "you" else "opponent",
-            winnerId = game.winner?.let { if (it == playerNumber) "you" else "opponent" }
+            winnerId = game.winner?.let { if (it == playerNumber) "you" else "opponent" },
+            updatedAt = game.updatedAt
         )
         return response(200, gson.toJson(responseBody))
     }
@@ -192,6 +193,8 @@ class RequestRouter @Inject constructor(
         val humanFireResult = firingService.fire(gameId, playerToken, request.row, request.col)
         val humanResponse = humanFireResult.response
 
+        val requestingPlayerNumber = humanFireResult.game.resolvePlayerNumber(playerToken)
+
         var aiResponse: FireResponse? = null
         if (!humanResponse.gameOver) {
             val currentGame = humanFireResult.game
@@ -207,13 +210,16 @@ class RequestRouter @Inject constructor(
             }
         }
 
+        fun normalizeWinnerId(winnerId: String?): String? =
+            winnerId?.let { if (it == requestingPlayerNumber.toString()) "you" else "opponent" }
+
         val responseBody = FireResponseWithAi(
             result = humanResponse.result,
             coordinate = humanResponse.coordinate,
             sunkShip = humanResponse.sunkShip,
             gameOver = humanResponse.gameOver || (aiResponse?.gameOver == true),
-            winnerId = humanResponse.winnerId ?: aiResponse?.winnerId,
-            aiResult = aiResponse
+            winnerId = normalizeWinnerId(humanResponse.winnerId ?: aiResponse?.winnerId),
+            aiResult = aiResponse?.copy(winnerId = normalizeWinnerId(aiResponse.winnerId))
         )
         return response(200, gson.toJson(responseBody))
     }

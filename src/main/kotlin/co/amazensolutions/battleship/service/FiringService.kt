@@ -75,7 +75,7 @@ class FiringService @Inject constructor(
                 coordinate = coordinate,
                 sunkShip = if (result == ShotResult.SUNK || result == ShotResult.GAME_OVER) hitShip?.type else null,
                 gameOver = gameOver,
-                winnerId = if (gameOver) "player$playerNumber" else null
+                winnerId = if (gameOver) playerNumber.toString() else null
             ),
             game = updatedGame
         )

@@ -48,7 +48,8 @@ data class GameStateResponse(
     val playerBoard: BoardView,
     val opponentBoard: BoardView,
     val currentTurn: String,
-    val winnerId: String? = null
+    val winnerId: String? = null,
+    val updatedAt: Long
 )
 
 data class BoardView(
