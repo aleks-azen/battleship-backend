@@ -20,6 +20,7 @@ class GameService @Inject constructor(
 ) {
     private val gson = GsonBuilder().create()
     private val ttlDuration = 24 * 60 * 60L // 24 hours in seconds
+    private val completedTtlDuration = 7 * 24 * 60 * 60L // 7 days in seconds
 
     fun createGame(mode: GameMode): Game {
         val now = System.currentTimeMillis()
@@ -56,7 +57,7 @@ class GameService @Inject constructor(
             mode = updatedGame.mode.name,
             createdAt = updatedGame.createdAt,
             updatedAt = now,
-            ttl = if (updatedGame.status == GameStatus.COMPLETED) null else (now / 1000) + ttlDuration
+            ttl = if (updatedGame.status == GameStatus.COMPLETED) (now / 1000) + completedTtlDuration else (now / 1000) + ttlDuration
         )
         gamesTable.putItem(record)
     }
