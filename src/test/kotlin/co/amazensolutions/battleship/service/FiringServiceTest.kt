@@ -83,7 +83,7 @@ class FiringServiceTest {
         val game = gameWithShips()
         stubGame(game)
 
-        val result = firingService.fire("test-game", "p1-token", 5, 5)
+        val result = firingService.fire("test-game", "p1-token", 5, 5).response
 
         assertEquals(ShotResult.MISS, result.result)
         assertEquals(Coordinate(5, 5), result.coordinate)
@@ -97,7 +97,7 @@ class FiringServiceTest {
         val game = gameWithShips()
         stubGame(game)
 
-        val result = firingService.fire("test-game", "p1-token", 0, 0)
+        val result = firingService.fire("test-game", "p1-token", 0, 0).response
 
         assertEquals(ShotResult.HIT, result.result)
         assertNull(result.sunkShip)
@@ -117,7 +117,7 @@ class FiringServiceTest {
         stubGame(preHitGame)
 
         // Fire at (0,1) to sink the destroyer
-        val result = firingService.fire("test-game", "p1-token", 0, 1)
+        val result = firingService.fire("test-game", "p1-token", 0, 1).response
 
         assertEquals(ShotResult.GAME_OVER, result.result) // only 1 ship, sinking it ends the game
         assertEquals(ShipType.DESTROYER, result.sunkShip)
@@ -139,7 +139,7 @@ class FiringServiceTest {
         val preHitGame = game.copy(player2 = game.player2.copy(board = preHitBoard))
         stubGame(preHitGame)
 
-        val result = firingService.fire("test-game", "p1-token", 0, 1)
+        val result = firingService.fire("test-game", "p1-token", 0, 1).response
 
         assertEquals(ShotResult.SUNK, result.result)
         assertEquals(ShipType.DESTROYER, result.sunkShip)
@@ -156,7 +156,7 @@ class FiringServiceTest {
         )
         stubGame(withShot)
 
-        val result = firingService.fire("test-game", "p1-token", 3, 3)
+        val result = firingService.fire("test-game", "p1-token", 3, 3).response
 
         assertEquals(ShotResult.ALREADY_SHOT, result.result)
     }
@@ -241,7 +241,7 @@ class FiringServiceTest {
         val preHitGame = game.copy(player2 = game.player2.copy(board = preHitBoard))
         stubGame(preHitGame)
 
-        val result = firingService.fire("test-game", "p1-token", 0, 1)
+        val result = firingService.fire("test-game", "p1-token", 0, 1).response
 
         assertTrue(result.gameOver)
         assertEquals(ShotResult.GAME_OVER, result.result)

@@ -18,7 +18,6 @@ import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AiServiceTest {
@@ -438,8 +437,35 @@ class AiServiceTest {
             PlacedShip(ShipType.DESTROYER, Coordinate(8, 0), Orientation.HORIZONTAL)
         )
 
+        val (game, shotCount) = simulateAiGame("sim", p1Ships, checkNoDuplicates = true)
+
+        assertTrue(game.player1.board.allShipsSunk(), "AI should sink all ships. Took $shotCount shots")
+        assertTrue(shotCount <= 100, "AI took too many shots: $shotCount")
+    }
+
+    @Test
+    fun `AI wins within 70 shots on average across multiple games`() {
+        var totalShots = 0
+        val numGames = 20
+
+        repeat(numGames) {
+            val p1Ships = aiService.generateRandomPlacement()
+            val (game, shotCount) = simulateAiGame("sim-$it", p1Ships)
+            assertTrue(game.player1.board.allShipsSunk(), "AI failed to sink all ships in game $it")
+            totalShots += shotCount
+        }
+
+        val avgShots = totalShots.toDouble() / numGames
+        assertTrue(avgShots <= 70, "AI averaged $avgShots shots, expected <= 70")
+    }
+
+    private fun simulateAiGame(
+        gameId: String,
+        p1Ships: List<PlacedShip>,
+        checkNoDuplicates: Boolean = false
+    ): Pair<Game, Int> {
         var game = Game(
-            gameId = "sim",
+            gameId = gameId,
             mode = GameMode.SINGLE_PLAYER,
             status = GameStatus.IN_PROGRESS,
             player1Token = "p1",
@@ -455,7 +481,9 @@ class AiServiceTest {
 
         while (shotCount < 100) {
             val target = aiService.chooseAiTarget(game)
-            assertFalse(target in firedAt, "AI fired at $target twice on shot #$shotCount")
+            if (checkNoDuplicates) {
+                assertFalse(target in firedAt, "AI fired at $target twice on shot #$shotCount")
+            }
             firedAt.add(target)
 
             val board = game.player1.board
@@ -471,67 +499,14 @@ class AiServiceTest {
             }
             val sunkType = if (result == ShotResult.SUNK || result == ShotResult.GAME_OVER) hitShip?.type else null
 
-            game = game.copy(
-                player1 = game.player1.copy(board = updatedBoard)
-            )
+            game = game.copy(player1 = game.player1.copy(board = updatedBoard))
             game = aiService.updateAiStateAfterShot(game, target, result, sunkType)
 
             shotCount++
             if (result == ShotResult.GAME_OVER) break
         }
 
-        assertTrue(game.player1.board.allShipsSunk(), "AI should sink all ships. Took $shotCount shots")
-        assertTrue(shotCount <= 100, "AI took too many shots: $shotCount")
-    }
-
-    @Test
-    fun `AI wins within 70 shots on average across multiple games`() {
-        var totalShots = 0
-        val numGames = 20
-
-        repeat(numGames) {
-            val p1Ships = aiService.generateRandomPlacement()
-            var game = Game(
-                gameId = "sim-$it",
-                mode = GameMode.SINGLE_PLAYER,
-                status = GameStatus.IN_PROGRESS,
-                player1Token = "p1",
-                player2Token = "AI",
-                currentTurn = 2,
-                player1 = PlayerState(board = Board(ships = p1Ships), shipsPlaced = true),
-                player2 = PlayerState(shipsPlaced = true),
-                aiState = AiState()
-            )
-
-            var shotCount = 0
-            while (shotCount < 100) {
-                val target = aiService.chooseAiTarget(game)
-                val board = game.player1.board
-                val hitShip = board.ships.find { target in it.occupiedCells() }
-                val updatedHits = if (hitShip != null) board.hits + target else board.hits
-                val updatedBoard = board.copy(shots = board.shots + target, hits = updatedHits)
-
-                val result = when {
-                    hitShip == null -> ShotResult.MISS
-                    hitShip.isSunk(updatedHits) && updatedBoard.allShipsSunk() -> ShotResult.GAME_OVER
-                    hitShip.isSunk(updatedHits) -> ShotResult.SUNK
-                    else -> ShotResult.HIT
-                }
-                val sunkType = if (result == ShotResult.SUNK || result == ShotResult.GAME_OVER) hitShip?.type else null
-
-                game = game.copy(player1 = game.player1.copy(board = updatedBoard))
-                game = aiService.updateAiStateAfterShot(game, target, result, sunkType)
-
-                shotCount++
-                if (result == ShotResult.GAME_OVER) break
-            }
-
-            assertTrue(game.player1.board.allShipsSunk(), "AI failed to sink all ships in game $it")
-            totalShots += shotCount
-        }
-
-        val avgShots = totalShots.toDouble() / numGames
-        assertTrue(avgShots <= 70, "AI averaged $avgShots shots, expected <= 70")
+        return Pair(game, shotCount)
     }
 
     // --- Helpers ---

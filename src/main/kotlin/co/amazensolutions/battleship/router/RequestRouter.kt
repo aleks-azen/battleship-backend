@@ -189,30 +189,31 @@ class RequestRouter @Inject constructor(
         val gameId = extractPathParam(input.path, "/fire")
         val playerToken = requirePlayerToken(input)
         val request = gson.fromJson(input.body, FireRequest::class.java)
-        val humanResult = firingService.fire(gameId, playerToken, request.row, request.col)
+        val humanFireResult = firingService.fire(gameId, playerToken, request.row, request.col)
+        val humanResponse = humanFireResult.response
 
-        var aiResult: FireResponse? = null
-        if (!humanResult.gameOver) {
-            val currentGame = gameService.getGame(gameId)!!
+        var aiResponse: FireResponse? = null
+        if (!humanResponse.gameOver) {
+            val currentGame = humanFireResult.game
             if (currentGame.mode == GameMode.SINGLE_PLAYER && currentGame.currentTurn == 2) {
                 val target = aiService.chooseAiTarget(currentGame)
-                aiResult = firingService.fire(gameId, currentGame.player2Token, target.row, target.col, isServerAiCall = true)
+                val aiFireResult = firingService.fire(gameId, currentGame.player2Token, target.row, target.col, isServerAiCall = true)
+                aiResponse = aiFireResult.response
 
-                val gameAfterShot = gameService.getGame(gameId)!!
                 val updatedGame = aiService.updateAiStateAfterShot(
-                    gameAfterShot, target, aiResult.result, aiResult.sunkShip
+                    aiFireResult.game, target, aiResponse.result, aiResponse.sunkShip
                 )
                 gameService.saveGame(updatedGame)
             }
         }
 
         val responseBody = FireResponseWithAi(
-            result = humanResult.result,
-            coordinate = humanResult.coordinate,
-            sunkShip = humanResult.sunkShip,
-            gameOver = humanResult.gameOver || (aiResult?.gameOver == true),
-            winnerId = humanResult.winnerId ?: aiResult?.winnerId,
-            aiResult = aiResult
+            result = humanResponse.result,
+            coordinate = humanResponse.coordinate,
+            sunkShip = humanResponse.sunkShip,
+            gameOver = humanResponse.gameOver || (aiResponse?.gameOver == true),
+            winnerId = humanResponse.winnerId ?: aiResponse?.winnerId,
+            aiResult = aiResponse
         )
         return response(200, gson.toJson(responseBody))
     }

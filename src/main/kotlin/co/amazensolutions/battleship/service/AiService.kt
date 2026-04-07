@@ -111,14 +111,7 @@ class AiService @Inject constructor() {
 
         return when (state.mode) {
             AiMode.HUNT -> AiState(mode = AiMode.TARGET, targetHits = updatedHits)
-            AiMode.TARGET -> {
-                val direction = determineDirection(updatedHits)
-                if (direction != null) {
-                    AiState(mode = AiMode.DESTROY, targetHits = updatedHits, destroyDirection = direction)
-                } else {
-                    AiState(mode = AiMode.TARGET, targetHits = updatedHits)
-                }
-            }
+            AiMode.TARGET -> stateForHits(updatedHits)
             AiMode.DESTROY -> AiState(
                 mode = AiMode.DESTROY,
                 targetHits = updatedHits,
@@ -138,15 +131,16 @@ class AiService @Inject constructor() {
 
         return when {
             remainingHits.isEmpty() -> AiState(mode = AiMode.HUNT)
-            remainingHits.size == 1 -> AiState(mode = AiMode.TARGET, targetHits = remainingHits)
-            else -> {
-                val direction = determineDirection(remainingHits)
-                if (direction != null) {
-                    AiState(mode = AiMode.DESTROY, targetHits = remainingHits, destroyDirection = direction)
-                } else {
-                    AiState(mode = AiMode.TARGET, targetHits = remainingHits)
-                }
-            }
+            else -> stateForHits(remainingHits)
+        }
+    }
+
+    private fun stateForHits(hits: List<Coordinate>): AiState {
+        val direction = determineDirection(hits)
+        return if (direction != null) {
+            AiState(mode = AiMode.DESTROY, targetHits = hits, destroyDirection = direction)
+        } else {
+            AiState(mode = AiMode.TARGET, targetHits = hits)
         }
     }
 

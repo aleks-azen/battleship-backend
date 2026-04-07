@@ -2,6 +2,7 @@ package co.amazensolutions.battleship.service
 
 import co.amazensolutions.battleship.model.Coordinate
 import co.amazensolutions.battleship.model.FireResponse
+import co.amazensolutions.battleship.model.FireResult
 import co.amazensolutions.battleship.model.GameStatus
 import co.amazensolutions.battleship.model.ShotResult
 import com.google.inject.Inject
@@ -12,7 +13,7 @@ class FiringService @Inject constructor(
     private val gameService: GameService
 ) {
 
-    fun fire(gameId: String, playerToken: String, row: Int, col: Int, isServerAiCall: Boolean = false): FireResponse {
+    fun fire(gameId: String, playerToken: String, row: Int, col: Int, isServerAiCall: Boolean = false): FireResult {
         val game = gameService.getGame(gameId)
             ?: throw IllegalArgumentException("Game not found: $gameId")
         require(game.status == GameStatus.IN_PROGRESS) {
@@ -33,9 +34,12 @@ class FiringService @Inject constructor(
         val targetBoard = game.opponentState(playerNumber).board
 
         if (coordinate in targetBoard.shots) {
-            return FireResponse(
-                result = ShotResult.ALREADY_SHOT,
-                coordinate = coordinate
+            return FireResult(
+                response = FireResponse(
+                    result = ShotResult.ALREADY_SHOT,
+                    coordinate = coordinate
+                ),
+                game = game
             )
         }
 
@@ -65,12 +69,15 @@ class FiringService @Inject constructor(
         )
         gameService.saveGame(updatedGame)
 
-        return FireResponse(
-            result = result,
-            coordinate = coordinate,
-            sunkShip = if (result == ShotResult.SUNK || result == ShotResult.GAME_OVER) hitShip?.type else null,
-            gameOver = gameOver,
-            winnerId = if (gameOver) "player$playerNumber" else null
+        return FireResult(
+            response = FireResponse(
+                result = result,
+                coordinate = coordinate,
+                sunkShip = if (result == ShotResult.SUNK || result == ShotResult.GAME_OVER) hitShip?.type else null,
+                gameOver = gameOver,
+                winnerId = if (gameOver) "player$playerNumber" else null
+            ),
+            game = updatedGame
         )
     }
 }

@@ -73,6 +73,11 @@ data class FireResponseWithAi(
     val aiResult: FireResponse? = null
 )
 
+data class FireResult(
+    val response: FireResponse,
+    val game: Game
+)
+
 data class ErrorResponse(
     val message: String,
     val code: String
