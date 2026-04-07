@@ -28,6 +28,13 @@ class RequestRouter @Inject constructor(
 ) {
     private val gson = GsonBuilder().create()
 
+    companion object {
+        private val GAME_STATE_PATTERN = Regex("/games/[^/]+/state")
+        private val GAME_SHIPS_PATTERN = Regex("/games/[^/]+/ships")
+        private val GAME_FIRE_PATTERN = Regex("/games/[^/]+/fire")
+        private val GAME_ID_PATTERN = Regex("/games/[^/]+")
+    }
+
     private val corsHeaders = mapOf(
         "Access-Control-Allow-Origin" to "*",
         "Access-Control-Allow-Methods" to "GET,POST,PUT,DELETE,OPTIONS",
@@ -46,11 +53,11 @@ class RequestRouter @Inject constructor(
             when {
                 method == "OPTIONS" -> response(200, "")
                 method == "POST" && path == "/games" -> createGame(input)
-                method == "GET" && path.matches(Regex("/games/[^/]+/state")) -> getGameState(input)
+                method == "GET" && path.matches(GAME_STATE_PATTERN) -> getGameState(input)
                 method == "GET" && path == "/games/history" -> getHistory()
-                method == "POST" && path.matches(Regex("/games/[^/]+/ships")) -> placeShips(input)
-                method == "POST" && path.matches(Regex("/games/[^/]+/fire")) -> fire(input)
-                method == "DELETE" && path.matches(Regex("/games/[^/]+")) -> deleteGame(input)
+                method == "POST" && path.matches(GAME_SHIPS_PATTERN) -> placeShips(input)
+                method == "POST" && path.matches(GAME_FIRE_PATTERN) -> fire(input)
+                method == "DELETE" && path.matches(GAME_ID_PATTERN) -> deleteGame(input)
                 else -> response(404, gson.toJson(ErrorResponse("Route not found", "NOT_FOUND")))
             }
         } catch (e: IllegalArgumentException) {
@@ -82,14 +89,14 @@ class RequestRouter @Inject constructor(
         val game = gameService.getGame(gameId)
             ?: return response(404, gson.toJson(ErrorResponse("Game not found", "NOT_FOUND")))
 
-        val playerNumber = when (playerToken) {
-            game.player1Token -> 1
-            game.player2Token -> 2
-            else -> return response(403, gson.toJson(ErrorResponse("Invalid player token", "FORBIDDEN")))
+        val playerNumber = try {
+            game.resolvePlayerNumber(playerToken)
+        } catch (_: IllegalArgumentException) {
+            return response(403, gson.toJson(ErrorResponse("Invalid player token", "FORBIDDEN")))
         }
 
-        val playerBoard = if (playerNumber == 1) game.player1.board else game.player2.board
-        val opponentBoard = if (playerNumber == 1) game.player2.board else game.player1.board
+        val playerBoard = game.playerState(playerNumber).board
+        val opponentBoard = game.opponentState(playerNumber).board
 
         val responseBody = GameStateResponse(
             gameId = game.gameId,
@@ -135,7 +142,7 @@ class RequestRouter @Inject constructor(
     }
 
     private fun deleteGame(input: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent {
-        val gameId = input.path.split("/").last { it.isNotEmpty() }
+        val gameId = extractPathParam(input.path, "")
         gameService.deleteGame(gameId)
         return response(204, "")
     }

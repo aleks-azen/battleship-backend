@@ -115,6 +115,14 @@ GameRecord stores the full Game as a JSON blob in `gameData`. Top-level DynamoDB
 When adding a field that needs to be queried or filtered (e.g., `winner`, `mode`), add it
 as BOTH a Game field AND a GameRecord top-level attribute. Do NOT rely on scanning the JSON blob.
 
+## Concurrency
+
+Lambda reserved concurrency is 1 (one instance at a time). As a belt-and-suspenders measure,
+use a `ConcurrentHashMap<String, ReentrantLock>` keyed by `gameId` in the router or handler.
+Acquire the lock before dispatching any mutating request (fire, place ships, join).
+Read-only requests (GET /state, GET /history) do NOT need the lock.
+This avoids DynamoDB conditional write complexity for demo scope. See ADR-09.
+
 ## Anti-Cheat
 
 - Server is single source of truth. Client is a view layer only.

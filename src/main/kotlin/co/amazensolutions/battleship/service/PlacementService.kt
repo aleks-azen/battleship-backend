@@ -20,7 +20,10 @@ class PlacementService @Inject constructor(
             "Cannot place ships in game with status ${game.status}"
         }
 
-        val playerNumber = resolvePlayerNumber(game, playerToken)
+        val playerNumber = game.resolvePlayerNumber(playerToken)
+        require(!game.isAiPlayer(playerNumber)) {
+            "Cannot perform actions for AI player"
+        }
 
         val placedShips = placements.map { placement ->
             PlacedShip(
@@ -32,7 +35,7 @@ class PlacementService @Inject constructor(
 
         validatePlacements(placedShips)
 
-        val playerState = if (playerNumber == 1) game.player1 else game.player2
+        val playerState = game.playerState(playerNumber)
         require(!playerState.shipsPlaced) {
             "Ships already placed for player $playerNumber"
         }
@@ -49,7 +52,6 @@ class PlacementService @Inject constructor(
             game.copy(player2 = updatedPlayerState)
         }
 
-        // Transition to IN_PROGRESS when both players have placed ships
         val bothPlaced = updatedGame.player1.shipsPlaced && updatedGame.player2.shipsPlaced
         val finalGame = if (bothPlaced) {
             updatedGame.copy(status = GameStatus.IN_PROGRESS)
@@ -59,14 +61,6 @@ class PlacementService @Inject constructor(
 
         gameService.saveGame(finalGame)
         return finalGame
-    }
-
-    private fun resolvePlayerNumber(game: Game, token: String): Int {
-        return when (token) {
-            game.player1Token -> 1
-            game.player2Token -> 2
-            else -> throw IllegalArgumentException("Invalid player token")
-        }
     }
 
     private fun validatePlacements(ships: List<PlacedShip>) {

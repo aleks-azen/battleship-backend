@@ -19,17 +19,16 @@ class FiringService @Inject constructor(
             "Cannot fire in game with status ${game.status}"
         }
 
-        val playerNumber = when (playerToken) {
-            game.player1Token -> 1
-            game.player2Token -> 2
-            else -> throw IllegalArgumentException("Invalid player token")
+        val playerNumber = game.resolvePlayerNumber(playerToken)
+        require(!game.isAiPlayer(playerNumber)) {
+            "Cannot perform actions for AI player"
         }
         require(playerNumber == game.currentTurn) {
             "It is not your turn"
         }
 
         val coordinate = Coordinate(row, col)
-        val targetBoard = if (playerNumber == 1) game.player2.board else game.player1.board
+        val targetBoard = game.opponentState(playerNumber).board
 
         if (coordinate in targetBoard.shots) {
             return FireResponse(
@@ -54,29 +53,14 @@ class FiringService @Inject constructor(
         }
 
         val gameOver = result == ShotResult.GAME_OVER
-        val updatedPlayerState = if (playerNumber == 1) {
-            game.player2.copy(board = updatedBoard)
-        } else {
-            game.player1.copy(board = updatedBoard)
-        }
-
-        val updatedGame = if (playerNumber == 1) {
-            game.copy(
-                player2 = updatedPlayerState,
-                status = if (gameOver) GameStatus.COMPLETED else game.status,
-                winner = if (gameOver) playerNumber else null,
-                currentTurn = if (!gameOver) 2 else game.currentTurn,
-                updatedAt = System.currentTimeMillis()
-            )
-        } else {
-            game.copy(
-                player1 = updatedPlayerState,
-                status = if (gameOver) GameStatus.COMPLETED else game.status,
-                winner = if (gameOver) playerNumber else null,
-                currentTurn = if (!gameOver) 1 else game.currentTurn,
-                updatedAt = System.currentTimeMillis()
-            )
-        }
+        val nextTurn = if (playerNumber == 1) 2 else 1
+        val updatedOpponent = game.opponentState(playerNumber).copy(board = updatedBoard)
+        val updatedGame = game.withUpdatedOpponent(playerNumber, updatedOpponent).copy(
+            status = if (gameOver) GameStatus.COMPLETED else game.status,
+            winner = if (gameOver) playerNumber else null,
+            currentTurn = if (!gameOver) nextTurn else game.currentTurn,
+            updatedAt = System.currentTimeMillis()
+        )
         gameService.saveGame(updatedGame)
 
         return FireResponse(

@@ -18,5 +18,5 @@ data class GameRecord(
 
     var updatedAt: Long = 0,
 
-    var ttl: Long = 0
+    var ttl: Long? = null
 )

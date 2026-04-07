@@ -31,7 +31,7 @@ class GameService @Inject constructor(
             player2 = PlayerState(),
             currentTurn = 1,
             player1Token = UUID.randomUUID().toString(),
-            player2Token = if (mode == GameMode.SINGLE_PLAYER) "AI" else UUID.randomUUID().toString(),
+            player2Token = UUID.randomUUID().toString(),
             createdAt = now,
             updatedAt = now
         )
@@ -56,7 +56,7 @@ class GameService @Inject constructor(
             mode = updatedGame.mode.name,
             createdAt = updatedGame.createdAt,
             updatedAt = now,
-            ttl = (now / 1000) + ttlDuration
+            ttl = if (updatedGame.status == GameStatus.COMPLETED) null else (now / 1000) + ttlDuration
         )
         gamesTable.putItem(record)
     }

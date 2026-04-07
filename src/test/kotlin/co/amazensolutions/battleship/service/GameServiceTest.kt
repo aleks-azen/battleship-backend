@@ -33,7 +33,7 @@ class GameServiceTest {
     }
 
     @Test
-    fun `createGame single player sets AI as player2Token`() {
+    fun `createGame single player generates UUID for both tokens`() {
         val recordSlot = slot<GameRecord>()
         every { gamesTable.putItem(capture(recordSlot)) } returns Unit
 
@@ -41,18 +41,21 @@ class GameServiceTest {
 
         assertEquals(GameMode.SINGLE_PLAYER, game.mode)
         assertEquals(GameStatus.PLACING_SHIPS, game.status)
-        assertEquals("AI", game.player2Token)
+        assertTrue(game.player2Token.isNotBlank())
+        assertTrue(game.player2Token != "AI")
         assertEquals(1, game.currentTurn)
         assertNull(game.winner)
         assertNotNull(game.gameId)
         assertNotNull(game.player1Token)
+        assertTrue(game.player1Token != game.player2Token)
 
         verify { gamesTable.putItem(any<GameRecord>()) }
         val saved = recordSlot.captured
         assertEquals(game.gameId, saved.gameId)
         assertEquals("PLACING_SHIPS", saved.status)
         assertEquals("SINGLE_PLAYER", saved.mode)
-        assertTrue(saved.ttl > 0)
+        assertNotNull(saved.ttl)
+        assertTrue(saved.ttl!! > 0)
     }
 
     @Test
@@ -85,7 +88,7 @@ class GameServiceTest {
             status = GameStatus.IN_PROGRESS,
             currentTurn = 1,
             player1Token = "p1-token",
-            player2Token = "AI"
+            player2Token = "p2-token"
         )
         val record = GameRecord(
             gameId = "test-id",
@@ -104,7 +107,7 @@ class GameServiceTest {
         assertEquals(GameMode.SINGLE_PLAYER, result.mode)
         assertEquals(GameStatus.IN_PROGRESS, result.status)
         assertEquals("p1-token", result.player1Token)
-        assertEquals("AI", result.player2Token)
+        assertEquals("p2-token", result.player2Token)
     }
 
     @Test
@@ -117,7 +120,7 @@ class GameServiceTest {
             mode = GameMode.SINGLE_PLAYER,
             status = GameStatus.IN_PROGRESS,
             player1Token = "p1",
-            player2Token = "AI"
+            player2Token = "p2"
         )
 
         gameService.saveGame(game)
@@ -126,7 +129,8 @@ class GameServiceTest {
         assertEquals("game-123", saved.gameId)
         assertEquals("IN_PROGRESS", saved.status)
         assertEquals("SINGLE_PLAYER", saved.mode)
-        assertTrue(saved.ttl > 0)
+        assertNotNull(saved.ttl)
+        assertTrue(saved.ttl!! > 0)
         assertTrue(saved.gameData.contains("game-123"))
 
         val deserialized = gson.fromJson(saved.gameData, Game::class.java)
@@ -144,7 +148,7 @@ class GameServiceTest {
             mode = GameMode.SINGLE_PLAYER,
             status = GameStatus.PLACING_SHIPS,
             player1Token = "p1",
-            player2Token = "AI",
+            player2Token = "p2",
             createdAt = oldTime,
             updatedAt = oldTime
         )
@@ -163,7 +167,7 @@ class GameServiceTest {
             mode = GameMode.SINGLE_PLAYER,
             status = GameStatus.COMPLETED,
             player1Token = "p1",
-            player2Token = "AI",
+            player2Token = "p2-ai",
             winner = 1
         )
         val game2 = Game(
